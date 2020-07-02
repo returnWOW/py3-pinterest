@@ -45,6 +45,7 @@ USER_HOME_FEED_RESOURCE = 'https://www.pinterest.com/_ngjs/resource/UserHomefeed
 BASE_SEARCH_RESOURCE = 'https://www.pinterest.com/resource/BaseSearchResource/get'
 BOARD_INVITES_RESOURCE = 'https://www.pinterest.com/_ngjs/resource/BoardInvitesResource/get'
 CREATE_COMMENT_RESOURCE = 'https://www.pinterest.com/_ngjs/resource/AggregatedCommentResource/create/'
+CREATE_COMMENT_RESOURCE2 = 'https://www.pinterest.com/resource/AggregatedCommentResource/create/'
 GET_PIN_COMMENTS_RESOURCE = 'https://www.pinterest.com/_ngjs/resource/AggregatedCommentFeedResource/get'
 LOAD_PIN_URL_FORMAT = 'https://www.pinterest.com/pin/{}/'
 DELETE_COMMENT = 'https://www.pinterest.com/_ngjs/resource/AggregatedCommentResource/delete/'
@@ -466,16 +467,20 @@ class Pinterest:
         :param text: text of the comment
         :return: python dict describing the pinterest response
         """
-        pin_data = self.load_pin(pin_id=pin_id)
+        # pin_data = self.load_pin(pin_id=pin_id)
+        pin_data_id = self.load_pin2(pin_id=pin_id)
+        if not pin_data_id:
+            raise TypeError("Pin data id not found.")
+        
         options = {
-            "objectId": pin_data['aggregated_pin_data']['id'],
+            "objectId": pin_data_id,
             "pinId": pin_id,
             "tags": "[]",
             "text": text
         }
         data = self.req_builder.buildPost(options=options, source_url=pin_id)
 
-        return self.post(url=CREATE_COMMENT_RESOURCE, data=data)
+        return self.post(url=CREATE_COMMENT_RESOURCE2, data=data)
 
     def load_pin(self, pin_id):
         """
@@ -491,6 +496,26 @@ class Pinterest:
             if 'pins' in s.text and 'aggregated_pin_data' in s.text:
                 pin_data = json.loads(s.text)
         return pin_data['pins'][str(pin_id)]
+
+    def load_pin2(self, pin_id):
+        """
+        Loads full information about a pin
+        :param pin_id: pin id to load
+        :return: python dict describing the pinterest response
+        """
+        resp = self.get(url=LOAD_PIN_URL_FORMAT.format(pin_id))
+        soup = BeautifulSoup(resp.text, 'html.parser')
+        scripts = soup.findAll('script')
+        # pin_data = {}
+        for s in scripts:
+            if s.string and 'pins' in s.string and 'aggregated_pin_data' in s.string:
+                # pin_data = json.loads(s.text)
+                import re
+                resp = re.search(r"aggregated_pin_data.*?\"id\".*?\"(\d+)\"", s.string, re.S)
+                if resp:
+                    return resp.group(1)
+        return None
+        # return pin_data['pins'][str(pin_id)]
 
     def get_comments(self, pin_id, page_size=50):
         """
